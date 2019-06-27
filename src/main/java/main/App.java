@@ -100,7 +100,7 @@ public class App {
 
                     try {
                         OutputStream os = new FileOutputStream(file);
-                        os.write(data);
+                        os.write(sign);
                         os.close();
                     } catch (FileNotFoundException ex) {
                     } catch (IOException ex) {
