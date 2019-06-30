@@ -24,6 +24,7 @@ import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.security.Security;
 import java.security.Signature;
 import java.security.SignatureException;
@@ -54,19 +55,24 @@ public class App {
             } catch (NumberFormatException ex) {
                 continue;
             }
-            String pkcs = "", doc = "", passw = "";
+            String pkcs = "", doc = "", passw = "", alias = "",doc2 = "";
+            KeyStore ks;
+            Key key = null;
+            Certificate certificate = null;
+            int tries = 0;
+            byte[] data, data2;
             switch (opt) {
                 case 1:
-                    pkcs = getFromConsole("informe o local do arquivo PKCS#12");
-                    passw = getFromConsole("informe a senha");
-                    KeyStore ks = getKeyStore(pkcs, passw);
-                    String alias = selectAlias(ks);
+                    pkcs = getFromConsole("Informe o local do arquivo PKCS#12");
+                    passw = getFromConsole("Informe a senha");
+                    ks = getKeyStore(pkcs, passw);
+                    alias = selectAlias(ks);
                     if (alias == "") {
                         System.out.println("erro");
                         break;
                     }
-                    Key key = null;
-                    int tries = 0;
+                    key = null;
+                    tries = 0;
                     while (key == null && tries < 3) {
                         try {
                             key = ks.getKey(alias, passw.toCharArray());
@@ -77,22 +83,22 @@ public class App {
 
                         //Certificate cert = ks.getCertificate(alias);
                         if (key == null) {
-                            passw = getFromConsole("informe a senha para a chave selecionada");
+                            passw = getFromConsole("Informe a senha para a chave selecionada");
                         }
                     }
                     if (tries >= 3) {
                         break;
                     }
 
-                    doc = getFromConsole("informe o local do documento");
-                    byte[] data = null;
+                    doc = getFromConsole("Informe o local do documento");
+                    data = null;
                     try {
                         data = Files.readAllBytes(Paths.get(doc));
                     } catch (IOException ex) {
                         Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
                     }
                     if (data == null) {
-                        System.out.println("documento invalido");
+                        System.out.println("Documento invalido");
                         break;
                     }
                     byte[] sign = generateSignature((PrivateKey) key, data);
@@ -108,10 +114,62 @@ public class App {
 
                     break;
                 case 2:
-                    pkcs = getFromConsole("informe o local do arquivo PKCS#12");
-                    System.out.println(pkcs);
-                    doc = getFromConsole("informe o local do documento");
-                    System.out.println(doc);
+                    pkcs = getFromConsole("Informe o local do arquivo PKCS#12");
+//                    System.out.println(pkcs);
+                    passw = getFromConsole("Informe a senha");
+                    ks = getKeyStore(pkcs, passw);
+                    alias = selectAlias(ks);
+                    if (alias == "") {
+                        System.out.println("Erro: Sem alias");
+                        break;
+                    }
+                    
+                    tries = 0;
+                    while (certificate == null && tries < 3) {
+                        try {
+                            certificate = ks.getCertificate(alias);
+                        } catch (KeyStoreException ex) {
+                            
+                        }
+                        //Certificate cert = ks.getCertificate(alias);
+                    }
+                    if (tries >= 3) {
+                        break;
+                    }
+                    
+                    doc = getFromConsole("Informe o local do documento aberto");
+//                    System.out.println(doc);
+                    data = null;
+                    try {
+                        data = Files.readAllBytes(Paths.get(doc));
+                    } catch (IOException ex) {
+                        Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                    if (data == null) {
+                        System.out.println("Documento invalido");
+                        break;
+                    }
+                    
+                    doc2 = getFromConsole("Informe o local do documento cifrado");
+//                    System.out.println(doc);
+                    data2 = null;
+                    try {
+                        data2 = Files.readAllBytes(Paths.get(doc2));
+                    } catch (IOException ex) {
+                        Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                    if (data2 == null) {
+                        System.out.println("Documento invalido");
+                        break;
+                    }
+                    
+                    boolean verify = verifySignature(certificate, data, data2);
+                    if(verify){
+                        System.out.println("Assinatura verificada");
+                    }
+                    else{
+                        System.out.println("Assinatura não verificada");
+                    }
                     break;
                 case 0:
                     stop = true;
@@ -194,5 +252,23 @@ public class App {
             Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
         }
         return null;
+    }
+    
+    public static boolean verifySignature(Certificate certificate, byte[] data,byte[] data2) {
+        try {
+            Signature signature = Signature.getInstance("SHA1withRSA");
+            signature.initVerify(certificate);
+            signature.update(data);
+            return signature.verify(data2);
+//            return signature.sign();
+        } catch (NoSuchAlgorithmException ex) {
+            Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (InvalidKeyException ex) {
+            Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (SignatureException ex) {
+            Logger.getLogger(App.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        
+        return false;
     }
 }
